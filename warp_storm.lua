@@ -26,9 +26,6 @@
     The three severities are defined in STORM_TYPES: the rarer the storm
     the bigger its cuboid and the more blocks it displaces / flesh it grows.
 
-    Every tunable number lives in one place - the constant block right at
-    the top - and is written in human terms (hours, seconds, "1 in 8", ...)
-    instead of raw engine numbers.
 --]]
 
 -- ======================================================================
@@ -61,14 +58,14 @@ local STORM_TYPES = {
         weight = 60,                 -- ~60% of all storms
         area_size = 5,
         min_bolts = 2,
-        max_bolts = 3,
+        max_bolts = 5,
         bolt_min_length = 3,
         bolt_max_length = 6,
         max_moved_blocks = 2,
         move_chance_1_in = 12,
         max_flesh_blocks = 2,
         flesh_chance_1_in = 12,
-        rain_per_second = 8,
+        rain_per_second = 18,
     },
     {
         name = "moderate",
@@ -76,14 +73,14 @@ local STORM_TYPES = {
         weight = 30,                 -- ~30% of all storms
         area_size = 8,
         min_bolts = 3,
-        max_bolts = 4,
+        max_bolts = 7,
         bolt_min_length = 4,
         bolt_max_length = 8,
         max_moved_blocks = 3,
         move_chance_1_in = 8,
         max_flesh_blocks = 3,
         flesh_chance_1_in = 8,
-        rain_per_second = 12,
+        rain_per_second = 26,
     },
     {
         name = "severe",
@@ -91,20 +88,26 @@ local STORM_TYPES = {
         weight = 10,                 -- ~10% of all storms
         area_size = 12,
         min_bolts = 4,
-        max_bolts = 6,
+        max_bolts = 11,
         bolt_min_length = 6,
         bolt_max_length = 12,
         max_moved_blocks = 6,
         move_chance_1_in = 4,
         max_flesh_blocks = 6,
         flesh_chance_1_in = 4,
-        rain_per_second = 18,
+        rain_per_second = 32,
     },
 }
 
+-- Lit candles ward off storms. Any lit candle within this many nodes of the
+-- candidate centre suppresses the storm — unless the storm is severe and
+-- rolls the bypass chance.
+local CANDLE_PROTECT_RADIUS = 50
+local CANDLE_BYPASS_SEVERE_CHANCE = 0.1 -- 10 % of severe storms ignore candles
+
 -- How long each bolt of lightning stays before disappearing. The rain below
 -- is timed to finish at exactly this moment so no mote outlives the storm.
-local LIGHTNING_LIFETIME = 18 -- seconds
+local LIGHTNING_LIFETIME = 13 -- seconds
 
 -- Health removed per second while a player stands inside a bolt.
 local LIGHTNING_DAMAGE = 6
@@ -121,22 +124,25 @@ local BOLT_BRANCH_CHANCE = 0.3 -- 30% per step
 -- storm (next to the bolts) instead of raining down on it from above. The
 -- spawn rate is per storm type (it grows with severity).
 local RAIN_MIN_SPEED = 1 -- slowest sink, nodes/second
-local RAIN_MAX_SPEED = 3 -- fastest sink, nodes/second
+local RAIN_MAX_SPEED = 8 -- fastest sink, nodes/second
 local RAIN_MIN_FADE = 0.4 -- earliest a mote fades, seconds after spawn
 local RAIN_MAX_FADE = 1.2 -- latest a mote fades (keeps motes inside the volume)
 
 -- How long (seconds) a storm centre stays "active" for mote catchers.
 -- Slightly longer than LIGHTNING_LIFETIME so catchers near the tail end
 -- still register the storm.
-local STORM_ACTIVITY_DURATION = 20
+local STORM_ACTIVITY_DURATION = LIGHTNING_LIFETIME
 
 -- Active storm volumes, exposed on sbz_api for the mote catcher.
--- Each entry: { minp = {x,y,z}, maxp = {x,y,z}, time = core.get_us_time() }
--- minp/maxp are the literal storm volume; consumers negotiate their own
--- reach (the mote catcher expands it by a margin when checking).
--- Consumers treating a storm as "gone" prune entries older than
+-- Each entry: { id = 1-based counter, name = severity, minp = {x,y,z},
+--               maxp = {x,y,z}, time = core.get_us_time() }
+-- The id is unique per server run and ties log lines back to the exact storm
+-- that produced them. minp/maxp are the literal storm volume; consumers
+-- negotiate their own reach (the mote catcher expands it by a margin when
+-- checking). Consumers treating a storm as "gone" prune entries older than
 -- sbz_api.storm_activity_duration_us themselves.
 local active_storms = {}
+local storm_seq = 0
 sbz_api.active_storms = active_storms
 sbz_api.storm_activity_duration_us = STORM_ACTIVITY_DURATION * 1e6
 
@@ -202,7 +208,7 @@ local function make_lightning_definition(frames, hex)
         use_texture_alpha = "clip", -- keep the bolt's transparency
         damage_per_second = LIGHTNING_DAMAGE, -- zaps a player standing inside
         groups = {
-            skyblktwo_warp_lightning = 1, -- lets the decay ABM find every bolt
+            no_horizons_warp_lightning = 1, -- lets the decay ABM find every bolt
             not_in_creative_inventory = 1,
             dig_immediate = 3,
         },
@@ -213,8 +219,8 @@ end
 
 for i = 1, #STORM_TYPES do
     local hex = VARIANT_HEX[i]
-    LIGHTNING_A_NAMES[i] = "skyblktwo:warp_lightning_a_" .. i
-    LIGHTNING_B_NAMES[i] = "skyblktwo:warp_lightning_b_" .. i
+    LIGHTNING_A_NAMES[i] = "no_horizons:warp_lightning_a_" .. i
+    LIGHTNING_B_NAMES[i] = "no_horizons:warp_lightning_b_" .. i
     core.register_node(LIGHTNING_A_NAMES[i], make_lightning_definition(BOLT_A_FRAMES, hex))
     core.register_node(LIGHTNING_B_NAMES[i], make_lightning_definition(BOLT_B_FRAMES, hex))
 end
@@ -236,18 +242,19 @@ local WARP_FLESH_SOUNDS = {
 }
 
 local WARP_FLESH_GROUPS = {
-    cracky = 2,
-    oddly_breakable_by_hand = 2,
+    matter = 1, -- robotic arm & drill dig it fast (like common stone)
+    cracky = 3, -- on par with ordinary stone for cracky tools
+    oddly_breakable_by_hand = 3, -- the bare hand makes short work of it too
     not_in_creative_inventory = 1,
 }
 
 -- The storm may leave behind one of two fleshy variants.
 local WARP_FLESH_VARIANTS = {
-    "skyblktwo:warp_flesh",
-    "skyblktwo:warp_meat",
+    "no_horizons:warp_flesh",
+    "no_horizons:warp_meat",
 }
 
-core.register_node("skyblktwo:warp_flesh", {
+core.register_node("no_horizons:warp_flesh", {
     description = "Warp Flesh",
     tiles = { "fleshblock.png" },
     groups = WARP_FLESH_GROUPS,
@@ -255,7 +262,7 @@ core.register_node("skyblktwo:warp_flesh", {
     is_ground_content = false,
 })
 
-core.register_node("skyblktwo:warp_meat", {
+core.register_node("no_horizons:warp_meat", {
     description = "Warp Meat",
     tiles = {
         {
@@ -285,15 +292,15 @@ core.register_node("skyblktwo:warp_meat", {
 -- spawn_warp_storm_at step 4.)
 core.register_abm({
     label = "Warp lightning decay",
-    nodenames = { "group:skyblktwo_warp_lightning" },
+    nodenames = { "group:no_horizons_warp_lightning" },
     interval = 1, -- run once per second ...
     chance = 1, -- ... for every bolt in loaded mapblocks
     action = function(pos, node)
         local meta = core.get_meta(pos)
 
         -- Age the bolt; remove it once it has lived long enough.
-        local age = meta:get_int("skyblktwo:lightning_age") + 1
-        meta:set_int("skyblktwo:lightning_age", age)
+        local age = meta:get_int("no_horizons:lightning_age") + 1
+        meta:set_int("no_horizons:lightning_age", age)
         if age >= LIGHTNING_LIFETIME then
             core.remove_node(pos)
         end
@@ -357,6 +364,17 @@ end
 
 local function hash(pos)
     return core.hash_node_position(pos)
+end
+
+-- Storms respect built protection zones (the same "areas" checks the game
+-- uses everywhere else). A position inside an owned, closed area is treated
+-- as untouchable: its blocks are never moved and no warp flesh appears
+-- there. The name below is never a real player, so is_protected only reports
+-- true for genuinely owned areas (open areas stay storm-warpable).
+local WARP_STORM_PROTECT_NAME = ".warp_storm"
+
+local function is_storm_protected(pos)
+    return core.is_protected(pos, WARP_STORM_PROTECT_NAME)
 end
 
 -- Pick where a storm will appear: somewhere horizontally near a random
@@ -485,13 +503,14 @@ local function build_lightning_plan(minp, maxp, scan, ty)
 end
 
 -- Grab a free air position that has not been claimed yet, and mark it used.
--- Returns nil when the cuboid has no more free air left.
+-- Only unprotected positions qualify so storms never add blocks (flesh or
+-- moved) into protected build zones. Returns nil when no free air is left.
 local function take_free_air(scan, taken)
     local free = {}
     for i = 1, #scan.air_list do
         local pos = scan.air_list[i]
         local h = hash(pos)
-        if not taken[h] then
+        if not taken[h] and not is_storm_protected(pos) then
             free[#free + 1] = pos
         end
     end
@@ -506,7 +525,7 @@ end
 -- Decide which pre-existing blocks get teleported. The storm type decides
 -- how many are picked, each moving only if its "1 in N" chance passes, to a
 -- random free air spot. Using the game's high-level mover keeps machine
--- contents intact.
+-- contents intact. Blocks inside protected areas are never moved.
 local function plan_block_moves(scan, taken, ty)
     local moves = {}
     if #scan.solid_positions == 0 then
@@ -520,7 +539,8 @@ local function plan_block_moves(scan, taken, ty)
             break
         end
         local picked = table.remove(solids, math.random(#solids))
-        if math.random() < 1 / ty.move_chance_1_in then
+        if not is_storm_protected(picked)
+                and math.random() < 1 / ty.move_chance_1_in then
             local target = take_free_air(scan, taken)
             if target then
                 moves[#moves + 1] = { from = picked, to = target }
@@ -565,6 +585,17 @@ local function pick_storm_type()
     return #STORM_TYPES -- fallback (e.g. empty table)
 end
 
+-- Check whether a lit candle exists within CANDLE_PROTECT_RADIUS of centre.
+-- Uses a single find_nodes_in_area call (one VoxelManip, engine-side scan).
+-- Returns the number of lit candles found (0 = not protected).
+local function count_candles_near(center)
+    local r = CANDLE_PROTECT_RADIUS
+    local minp = {x = center.x - r, y = center.y - r, z = center.z - r}
+    local maxp = {x = center.x + r, y = center.y + r, z = center.z + r}
+    local found = core.find_nodes_in_area(minp, maxp, {"group:lit_candles"})
+    return #found
+end
+
 -- Spawn a warp storm with its cuboid centred on the given point. The ambient
 -- scheduler hands it a random player offset; the orbplant (orbplant.lua)
 -- hands it a spot near the plant itself, so it is exposed on sbz_api below.
@@ -578,6 +609,32 @@ local function spawn_warp_storm_at(center)
     local variant = pick_storm_type()
     local ty = STORM_TYPES[variant]
     local hex = ty.hex
+
+    -- Candles ward off storms. A lit candle anywhere in the protection cube
+    -- cancels the storm, except sometimes the most severe one fights through.
+    local t0 = core.get_us_time()
+    local candle_count = count_candles_near(center)
+    local dt_ms = (core.get_us_time() - t0) / 1000
+    core.log("action", string.format(
+        "[no_horizons] candle protection scan at %s took %.2f ms (%d lit candles)",
+        core.pos_to_string(center), dt_ms, candle_count
+    ))
+    if candle_count > 0 then
+        local severe = ty and (ty.name == "severe")
+        if not severe or math.random() >= CANDLE_BYPASS_SEVERE_CHANCE then
+            core.log(
+                "action",
+                "[no_horizons] Warp storm cancelled near " .. core.pos_to_string(center)
+                    .. " (lit candle within " .. CANDLE_PROTECT_RADIUS .. " nodes)"
+            )
+            return
+        end
+        core.log(
+            "action",
+            "[no_horizons] Severe warp storm forced through candle protection at "
+                .. core.pos_to_string(center)
+        )
+    end
 
     local minp, maxp = storm_volume(center, ty.area_size)
     local scan = scan_storm_area(minp, maxp)
@@ -617,7 +674,7 @@ local function spawn_warp_storm_at(center)
     for i = 1, #bolt_plan do
         bolt_positions[i] = bolt_plan[i].pos
         local meta = core.get_meta(bolt_plan[i].pos)
-        meta:set_int("skyblktwo:lightning_age", 0)
+        meta:set_int("no_horizons:lightning_age", 0)
     end
 
     -- 4b. Rain: motes spawn scattered anywhere inside the storm volume, sink a
@@ -659,7 +716,7 @@ local function spawn_warp_storm_at(center)
         else
             core.log(
                 "warning",
-                "[skyblktwo] warp storm: sbz_api.move_node is unavailable, skipping a block move"
+                "[no_horizons] warp storm: sbz_api.move_node is unavailable, skipping a block move"
             )
         end
     end
@@ -675,23 +732,40 @@ local function spawn_warp_storm_at(center)
     -- 7. Record the storm volume so mote catchers can detect it.
     --    Prune entries older than STORM_ACTIVITY_DURATION first.
     local now = core.get_us_time()
+    local expired = 0
     for i = #active_storms, 1, -1 do
         if (now - active_storms[i].time) > STORM_ACTIVITY_DURATION * 1e6 then
             table.remove(active_storms, i)
+            expired = expired + 1
         end
     end
+    storm_seq = storm_seq + 1
     active_storms[#active_storms + 1] = {
+        id = storm_seq,
+        name = ty.name,
         minp = { x = minp.x, y = minp.y, z = minp.z },
         maxp = { x = maxp.x, y = maxp.y, z = maxp.z },
         time = now,
     }
+    if expired > 0 then
+        core.log("action", string.format(
+            "[no_horizons] pruned %d expired storm record(s) before adding storm #%d"
+                .. " (%d storm(s) tracked)",
+            expired, storm_seq, #active_storms
+        ))
+    end
 
     -- 8. A touch of ambience and a log line.
     core.sound_play({ name = "gen_zap_short", gain = 0.7, max_hear_distance = 48 }, { pos = center })
     core.log(
         "action",
-        "[skyblktwo] Warp storm manifested at " .. core.pos_to_string(center)
-            .. " (" .. ty.name .. " storm, " .. #bolt_plan .. " bolts)"
+        string.format(
+            "[no_horizons] Warp storm #%d (%s) manifested at %s, volume %s..%s,"
+                .. " %d bolts, %d storm(s) tracked",
+            storm_seq, ty.name, core.pos_to_string(center),
+            core.pos_to_string(minp), core.pos_to_string(maxp),
+            #bolt_plan, #active_storms
+        )
     )
 end
 
@@ -721,7 +795,7 @@ sbz_api.spawn_warp_storm_at = spawn_warp_storm_at
 
 -- A block that summons a warp storm when punched. Useful for testing or
 -- building "storm callers" in-game.
-core.register_node("skyblktwo:storm_trigger", {
+core.register_node("no_horizons:storm_trigger", {
     description = "Warp Storm Trigger",
     tiles = {
         "skyblktwo_storm_trigger_top.png",

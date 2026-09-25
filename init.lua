@@ -1,18 +1,37 @@
 -- Warp storms: random lightning storms that briefly appear near players,
 -- strike the area with VoxelManip-placed bolts, warp a few existing
 -- blocks around and can leave warp flesh behind. See warp_storm.lua.
-dofile(core.get_modpath("skyblktwo") .. "/warp_storm.lua")
+dofile(core.get_modpath("no_horizons") .. "/warp_storm.lua")
 
 -- Candles: colorable light sources, lit with igniter. See candles.lua.
-dofile(core.get_modpath("skyblktwo") .. "/candles.lua")
+dofile(core.get_modpath("no_horizons") .. "/candles.lua")
+
+-- Candles quest page in the base game's questbook. See quests.lua.
+dofile(core.get_modpath("no_horizons") .. "/quests.lua")
 
 -- Orbplant: a flesh-grown plant that needs CO₂ and calls down warp storms
 -- when mature. See orbplant.lua.
-dofile(core.get_modpath("skyblktwo") .. "/orbplant.lua")
+dofile(core.get_modpath("no_horizons") .. "/orbplant.lua")
 
 -- Mote Catcher: a machine that collects warp motes from nearby storms.
 -- See mote_catcher.lua.
-dofile(core.get_modpath("skyblktwo") .. "/mote_catcher.lua")
+dofile(core.get_modpath("no_horizons") .. "/mote_catcher.lua")
+
+-- Breaker Vacuum: a machine that pulls drops out of nearby Node Breakers.
+-- See breaker_vacuum.lua.
+dofile(core.get_modpath("no_horizons") .. "/breaker_vacuum.lua")
+
+-- Ultra Node Breaker: breaks any node and keeps drops for the vacuum.
+-- See ultra_node_breaker.lua.
+dofile(core.get_modpath("no_horizons") .. "/ultra_node_breaker.lua")
+
+-- Pusher: a powered piston that pushes blocks AND itself, marching forward
+-- indefinitely. See pusher.lua.
+dofile(core.get_modpath("no_horizons") .. "/pusher.lua")
+
+-- Power Relay: a self-contained mini switching station for mobile rigs that
+-- can be safely shoved around by a Pusher. See power_relay.lua.
+dofile(core.get_modpath("no_horizons") .. "/power_relay.lua")
 
 local pane_nodebox = {
     type = "connected",
@@ -215,6 +234,6 @@ core.register_on_mods_loaded(function()
     end
 
     if not found then
-        core.log("error", "[skyblktwo] No base-game tinted glass node found; panes were not registered")
+        core.log("error", "[no_horizons] No base-game tinted glass node found; panes were not registered")
     end
 end)

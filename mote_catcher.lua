@@ -9,13 +9,13 @@
     to run and has a 9-slot inventory compatible with pipeworks tubes.
 --]]
 
-local S = core.get_translator("skyblktwo")
+local S = core.get_translator("no_horizons")
 
 -- ======================================================================
 -- 1. WARP MOTE ITEM
 -- ======================================================================
 
-core.register_craftitem("skyblktwo:warp_mote", {
+core.register_craftitem("no_horizons:warp_mote", {
     description = S("Warp Mote"),
     inventory_image = "mote.png",
     stack_max = 256,
@@ -38,7 +38,7 @@ listring[context;main]
 listring[current_player;main]
 ]]
 
-sbz_api.register_stateful_machine("skyblktwo:mote_catcher", {
+sbz_api.register_stateful_machine("no_horizons:mote_catcher", {
     description = S("Mote Catcher"),
     sounds = sbz_audio.machine(),
     tiles = { "partcatch.png" },
@@ -62,6 +62,14 @@ sbz_api.register_stateful_machine("skyblktwo:mote_catcher", {
     output_inv = "main",
 
     autostate = true,
+
+    -- Same trick as the breaker vacuum: a Power Relay powers this without
+    -- ever touching base-grid state, so undo the "Machine timeout check"
+    -- ABM's switch-off the instant it happens.
+    on_timeout = function(pos)
+        sbz_api.turn_on(pos)
+        core.get_meta(pos):set_string("infotext", S("Running"))
+    end,
 
     action = function(pos, node, meta, supply, demand)
         -- Manual power check so autostate turns us visibly off when the
@@ -89,22 +97,28 @@ sbz_api.register_stateful_machine("skyblktwo:mote_catcher", {
 -- seconds.
 core.register_abm({
     label = "Mote catcher storm proximity",
-    nodenames = { "skyblktwo:mote_catcher_on" },
+    nodenames = { "no_horizons:mote_catcher_on" },
     interval = 3,
     chance = 1,
     action = function(pos, node)
-        if not sbz_api.active_storms then
-            return
-        end
-
         -- The catcher reaches a few nodes past the literal storm volume, so
         -- a catcher parked just outside the cuboid still collects motes.
         local margin = 2
         local now_us = core.get_us_time()
         local lifetime_us = sbz_api.storm_activity_duration_us or 20e6
-        for _, storm in ipairs(sbz_api.active_storms) do
+        local storms = sbz_api.active_storms or {}
+        if #storms == 0 then
+            return
+        end
+        -- Debug log: how many storm records this catcher sees each tick, so
+        -- it is obvious when a single storm is registered more than once.
+        core.log("action", string.format(
+            "[no_horizons] mote_catcher at %s: %d storm(s) tracked",
+            core.pos_to_string(pos), #storms
+        ))
+        for i, storm in ipairs(storms) do
             if now_us - storm.time > lifetime_us then
-                goto continue -- entries are in spawn order; skip the expired
+                goto continue -- stale entries are skipped, never collected from
             end
             local smin, smax = storm.minp, storm.maxp
             if pos.x >= smin.x - margin and pos.x <= smax.x + margin
@@ -112,10 +126,17 @@ core.register_abm({
                     and pos.z >= smin.z - margin and pos.z <= smax.z + margin then
                 local meta = core.get_meta(pos)
                 local inv = meta:get_inventory()
-                local count = math.random(5, 10)
-                local stack = ItemStack("skyblktwo:warp_mote " .. count)
+                local count = math.random(1, 3)
+                local stack = ItemStack("no_horizons:warp_mote " .. count)
                 if inv:room_for_item("main", stack) then
                     inv:add_item("main", stack)
+
+                    core.log("action", string.format(
+                        "[no_horizons] mote_catcher at %s: storm #%d (%s, "
+                            .. "entry %d/%d) matches; collected %d motes",
+                        core.pos_to_string(pos), storm.id or -1, storm.name or "?",
+                        i, #storms, count
+                    ))
 
                     core.add_particlespawner({
                         amount = 8,
@@ -132,7 +153,7 @@ core.register_abm({
                         glow = 12,
                     })
                 end
-                break
+                break -- one collection per tick even if several storms overlap
             end
             ::continue::
         end
@@ -149,7 +170,7 @@ do
     local AM = "sbz_resources:antimatter_dust"
     local WC = "sbz_resources:warp_crystal"
     core.register_craft({
-        output = "skyblktwo:mote_catcher_off",
+        output = "no_horizons:mote_catcher_off",
         recipe = {
             { TB, PC, TB },
             { AM, "",  AM },
