@@ -33,6 +33,14 @@ dofile(core.get_modpath("no_horizons") .. "/pusher.lua")
 -- can be safely shoved around by a Pusher. See power_relay.lua.
 dofile(core.get_modpath("no_horizons") .. "/power_relay.lua")
 
+-- Nebulas: filamentary warp glass clouds that build themselves from world
+-- gen. See nebula.lua and nebula.md.
+dofile(core.get_modpath("no_horizons") .. "/nebula.lua")
+
+-- Warp Glass: textureless, colourable glass you can walk through.
+-- See warp_glass.lua.
+dofile(core.get_modpath("no_horizons") .. "/warp_glass.lua")
+
 local pane_nodebox = {
     type = "connected",
     fixed = {{-1 / 16, -1 / 2, -1 / 16, 1 / 16, 1 / 2, 1 / 16}},

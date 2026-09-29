@@ -52,6 +52,101 @@ local S = core.get_translator("no_horizons")
 
 local GENERATION = 0 -- the relay makes no power; feed it batteries/generators
 local SCAN_BUDGET = 64 -- most nodes the local scan may touch before giving up
+local BLOCK_SIZE = 16
+local AUTONOMOUS_KEY = "autonomous"
+local RELAY_NAME = "no_horizons:power_relay"
+local RELAY_ON = RELAY_NAME .. "_on"
+local RELAY_OFF = RELAY_NAME .. "_off"
+
+local relay_forceloads = {}
+local block_forceload_refs = {}
+
+local function relay_position_hash(pos)
+    return core.hash_node_position(pos)
+end
+
+local function mapblock_hash(pos)
+    return core.hash_node_position({
+        x = math.floor(pos.x / BLOCK_SIZE),
+        y = math.floor(pos.y / BLOCK_SIZE),
+        z = math.floor(pos.z / BLOCK_SIZE),
+    })
+end
+
+local function is_relay_name(name)
+    return name == RELAY_ON or name == RELAY_OFF
+end
+
+local function release_relay_forceload(pos)
+    local relay_key = relay_position_hash(pos)
+    local block = relay_forceloads[relay_key]
+    if not block then
+        return
+    end
+
+    relay_forceloads[relay_key] = nil
+    local refs = block_forceload_refs[block] or 0
+    if refs > 1 then
+        block_forceload_refs[block] = refs - 1
+    else
+        block_forceload_refs[block] = nil
+        core.forceload_free_block(pos, false)
+    end
+end
+
+local function acquire_relay_forceload(pos)
+    local relay_key = relay_position_hash(pos)
+    local block = mapblock_hash(pos)
+    local old_block = relay_forceloads[relay_key]
+
+    if old_block == block then
+        return true
+    end
+    if old_block then
+        release_relay_forceload(pos)
+    end
+
+    local refs = block_forceload_refs[block] or 0
+    if refs == 0 and not core.forceload_block(pos, false) then
+        return false
+    end
+
+    block_forceload_refs[block] = refs + 1
+    relay_forceloads[relay_key] = block
+    return true
+end
+
+local function move_relay_forceload(old_pos, new_pos)
+    local old_key = relay_position_hash(old_pos)
+    local new_key = relay_position_hash(new_pos)
+    local new_block = mapblock_hash(new_pos)
+    local old_block = relay_forceloads[old_key]
+
+    if not old_block then
+        return acquire_relay_forceload(new_pos)
+    end
+    if old_block == new_block then
+        relay_forceloads[old_key] = nil
+        relay_forceloads[new_key] = new_block
+        return true
+    end
+
+    release_relay_forceload(old_pos)
+    return acquire_relay_forceload(new_pos)
+end
+
+local function relay_formspec(enabled)
+    return table.concat({
+        "formspec_version[4]",
+        "size[6,3.2]",
+        "label[0.4,0.2;" .. S("Power Relay") .. "]",
+        "label[0.4,0.7;" .. S("Keep this rig running without a nearby player?") .. "]",
+        ("button[0.4,1.4;5.2,0.9;toggle_autonomous;%s]"):format(
+            enabled and S("Disable autonomous operation") or S("Enable autonomous operation")),
+        "label[0.4,2.4;" .. (enabled and S("Autonomous operation is enabled")
+            or S("Autonomous operation is disabled")) .. "]",
+    })
+end
 
 -- Last measured per-tick draw of each machine this relay drove, so the gate
 -- can predict total demand even for machines that expose neither a
@@ -114,7 +209,7 @@ local function scan_rig(start)
             end
             seen[key] = true
 
-            local node = core.get_node_or_nil(npos)
+            local node = sbz_api.get_node_force(npos)
             if node == nil or node.name == "ignore" then
                 return
             end
@@ -148,6 +243,9 @@ local function relay_tick(pos)
     local ok, err = pcall(function()
         local generators, machines, batteries, relays = scan_rig(pos)
         local meta = core.get_meta(pos)
+        if meta:get_int(AUTONOMOUS_KEY) == 1 then
+            acquire_relay_forceload(pos)
+        end
 
         -- One master relay per clump: the lowest position hash wins, the
         -- others only bridge so two relays never drive the same machines.
@@ -174,10 +272,11 @@ local function relay_tick(pos)
         local battery_entries = {}
         for _, b in ipairs(batteries) do
             if not on_real_grid(b.pos) then
-                local bname = core.get_node(b.pos).name
-                local bdef = core.registered_nodes[bname]
-                local bmeta = core.get_meta(b.pos)
-                if bdef and bmeta:get_int("force_off") ~= 1 then
+                local bnode = sbz_api.get_node_force(b.pos)
+                local bname = bnode and bnode.name
+                local bdef = bname and core.registered_nodes[bname]
+                local bmeta = bname and core.get_meta(b.pos)
+                if bdef and bmeta and bmeta:get_int("force_off") ~= 1 then
                     local max = bdef.battery_max or 0
                     if bdef.get_battery_max then
                         max = tonumber(bdef.get_battery_max(b.pos, bmeta)) or 0
@@ -203,10 +302,11 @@ local function relay_tick(pos)
         -- Generators wired into the rig add their output to our pool.
         for _, g in ipairs(generators) do
             if not on_real_grid(g.pos) then
-                local gname = core.get_node(g.pos).name
-                local gdef = core.registered_nodes[gname]
-                local gmeta = core.get_meta(g.pos)
-                if gdef and gdef.action and gmeta:get_int("force_off") ~= 1 then
+                local gnode = sbz_api.get_node_force(g.pos)
+                local gname = gnode and gnode.name
+                local gdef = gname and core.registered_nodes[gname]
+                local gmeta = gname and core.get_meta(g.pos)
+                if gdef and gmeta and gdef.action and gmeta:get_int("force_off") ~= 1 then
                     local r = gdef.action(g.pos, gname, gmeta, supply, demand)
                     supply = supply + (tonumber(r) or 0)
                 end
@@ -218,10 +318,11 @@ local function relay_tick(pos)
         -- instead of letting some win on scan order.
         for _, m in ipairs(machines) do
             if not on_real_grid(m.pos) then
-                local mname = core.get_node(m.pos).name
-                local mdef = core.registered_nodes[mname]
-                local mmeta = core.get_meta(m.pos)
-                if mdef and mdef.action and mmeta:get_int("force_off") ~= 1 then
+                local mnode = sbz_api.get_node_force(m.pos)
+                local mname = mnode and mnode.name
+                local mdef = mname and core.registered_nodes[mname]
+                local mmeta = mname and core.get_meta(m.pos)
+                if mdef and mmeta and mdef.action and mmeta:get_int("force_off") ~= 1 then
                     required = required + estimate_demand(m.pos, mname, mdef, mmeta, supply)
                 end
             end
@@ -248,10 +349,11 @@ local function relay_tick(pos)
         local driven = 0
         for _, m in ipairs(machines) do
             if not on_real_grid(m.pos) then
-                local mname = core.get_node(m.pos).name
-                local mdef = core.registered_nodes[mname]
-                local mmeta = core.get_meta(m.pos)
-                if mdef and mdef.action and mmeta:get_int("force_off") ~= 1 then
+                local mnode = sbz_api.get_node_force(m.pos)
+                local mname = mnode and mnode.name
+                local mdef = mname and core.registered_nodes[mname]
+                local mmeta = mname and core.get_meta(m.pos)
+                if mdef and mmeta and mdef.action and mmeta:get_int("force_off") ~= 1 then
                     local r = mdef.action(m.pos, mname, mmeta, supply, demand)
                     local draw = tonumber(r) or 0
                     demand = demand + draw
@@ -321,6 +423,24 @@ local function relay_tick(pos)
     end
 end
 
+if mesecon and mesecon.register_on_mvps_move then
+    mesecon.register_on_mvps_move(function(moved_nodes)
+        for _, moved in ipairs(moved_nodes) do
+            if moved.node and is_relay_name(moved.node.name) then
+                local meta = core.get_meta(moved.pos)
+                if meta:get_int(AUTONOMOUS_KEY) == 1 then
+                    if not move_relay_forceload(moved.oldpos, moved.pos) then
+                        meta:set_int(AUTONOMOUS_KEY, 0)
+                        meta:set_string("formspec", relay_formspec(false))
+                    end
+                else
+                    release_relay_forceload(moved.oldpos)
+                end
+            end
+        end
+    end)
+end
+
 sbz_api.register_stateful("no_horizons:power_relay", {
     description = S("Power Relay"),
     sounds = sbz_audio.machine(),
@@ -330,7 +450,38 @@ sbz_api.register_stateful("no_horizons:power_relay", {
     sunlight_propagates = true,
     is_ground_content = false,
     on_construct = function(pos)
-        core.get_meta(pos):set_string("infotext", S("Power Relay"))
+        local meta = core.get_meta(pos)
+        meta:set_string("infotext", S("Power Relay"))
+        meta:set_string("formspec", relay_formspec(meta:get_int(AUTONOMOUS_KEY) == 1))
+    end,
+    on_destruct = function(pos)
+        release_relay_forceload(pos)
+    end,
+    on_rightclick = function(pos, _, clicker)
+        if not clicker then
+            return
+        end
+        local meta = core.get_meta(pos)
+        meta:set_string("formspec", relay_formspec(meta:get_int(AUTONOMOUS_KEY) == 1))
+    end,
+    on_receive_fields = function(pos, _, fields, sender)
+        if not sender or not fields.toggle_autonomous then
+            return
+        end
+
+        local meta = core.get_meta(pos)
+        if meta:get_int(AUTONOMOUS_KEY) == 1 then
+            release_relay_forceload(pos)
+            meta:set_int(AUTONOMOUS_KEY, 0)
+        elseif acquire_relay_forceload(pos) then
+            meta:set_int(AUTONOMOUS_KEY, 1)
+        else
+            local name = sender:get_player_name()
+            if name and name ~= "" then
+                core.chat_send_player(name, S("Could not enable autonomous operation; the forceload limit was reached."))
+            end
+        end
+        meta:set_string("formspec", relay_formspec(meta:get_int(AUTONOMOUS_KEY) == 1))
     end,
     info_extra = S(
         "A pocket switching station for mobile builds. Feeds every machine "

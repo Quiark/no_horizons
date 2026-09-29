@@ -30,23 +30,21 @@ listring[current_player;main]
 -- Move everything we can carry out of the drop-buffer of every Node Breaker
 -- and Ultra Node Breaker within RADIUS onto our own inventory.
 local function collect_from_breakers(pos, inv)
-    local min_pos = vector.subtract(pos, RADIUS)
-    local max_pos = vector.add(pos, RADIUS)
-    local breakers = core.find_nodes_in_area(min_pos, max_pos, {
-        "pipeworks:nodebreaker",
-        "no_horizons:ultra_node_breaker",
-    })
-    for _, bpos in ipairs(breakers) do
-        local binv = core.get_meta(bpos):get_inventory()
-        local drops = binv:get_list("main")
-        if drops then
-            for i, stack in ipairs(drops) do
-                if not stack:is_empty() then
-                    binv:set_stack("main", i, inv:add_item("main", stack))
+    iterate_around_radius(pos, function(bpos)
+        local node = sbz_api.get_node_force(bpos)
+        if node and (node.name == "pipeworks:nodebreaker"
+                or node.name == "no_horizons:ultra_node_breaker") then
+            local binv = core.get_meta(bpos):get_inventory()
+            local drops = binv:get_list("main")
+            if drops then
+                for i, stack in ipairs(drops) do
+                    if not stack:is_empty() then
+                        binv:set_stack("main", i, inv:add_item("main", stack))
+                    end
                 end
             end
         end
-    end
+    end, RADIUS)
 end
 
 sbz_api.register_stateful_machine("no_horizons:breaker_vacuum", {
@@ -68,6 +66,10 @@ sbz_api.register_stateful_machine("no_horizons:breaker_vacuum", {
 
     input_inv = "main",
     output_inv = "main",
+
+    get_power_needed = function()
+        return POWER_NEEDED
+    end,
 
     autostate = true,
 

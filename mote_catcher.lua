@@ -7,6 +7,9 @@
     The Mote Catcher is a machine that passively collects warp motes when
     a warp storm manifests within a radius of 3 nodes. It requires 200 Cj
     to run and has a 9-slot inventory compatible with pipeworks tubes.
+    Catching is strictly gated on that power: a catcher that nothing
+    drives stays dark and collects nothing, no matter how close a storm
+    gets.
 --]]
 
 local S = core.get_translator("no_horizons")
@@ -26,6 +29,26 @@ core.register_craftitem("no_horizons:warp_mote", {
 -- ======================================================================
 
 local POWER_NEEDED = 200
+
+-- A real Switching Station drives its machines once a second and a Power
+-- Relay every 0.5 s, so a feed stamp older than this means nobody is running
+-- us any more.  Deliberately shorter than the base grid's 3 s "Machine
+-- timeout check", so a rig that stalled (relay says "Not enough power") is
+-- already considered dark by the time that ABM fires.
+local POWER_STALE = 2
+
+-- Being lit (`_on`) is NOT proof of power: the base grid's timeout ABM and
+-- our own on_timeout flip the node around independently.  The only truthful
+-- answer is "was our action function actually called recently", and only
+-- that call site can know it had the power it asked for.
+local function mark_fed(meta, fed)
+    meta:set_int("fed", fed and 1 or 0)
+    if fed then meta:set_int("fed_at", os.time()) end
+end
+
+local function is_fed(meta)
+    return meta:get_int("fed") == 1 and (os.time() - meta:get_int("fed_at")) <= POWER_STALE
+end
 
 local formspec = [[
 formspec_version[7]
@@ -63,21 +86,34 @@ sbz_api.register_stateful_machine("no_horizons:mote_catcher", {
 
     autostate = true,
 
-    -- Same trick as the breaker vacuum: a Power Relay powers this without
-    -- ever touching base-grid state, so undo the "Machine timeout check"
-    -- ABM's switch-off the instant it happens.
-    on_timeout = function(pos)
-        sbz_api.turn_on(pos)
-        core.get_meta(pos):set_string("infotext", S("Running"))
+    -- The base grid's "Machine timeout check" ABM switches every machine it
+    -- has not seen for 3 s off, because it expects a Switching Station's
+    -- tick.  A Power Relay never "touches" that grid, so the check would
+    -- keep killing a perfectly healthy relay-driven rig.  Undo it - but only
+    -- when a feed is actually fresh, otherwise the check is telling the
+    -- truth (no network, no relay, or a relay that can not power us) and we
+    -- must stay dark and catch nothing.
+    on_timeout = function(pos, node)
+        local meta = core.get_meta(pos)
+        if is_fed(meta) then
+            sbz_api.turn_on(pos)
+            meta:set_string("infotext", S("Running"))
+        else
+            mark_fed(meta, false)
+            sbz_api.turn_off(pos)
+            meta:set_string("infotext", S("No power or network connection"))
+        end
     end,
 
     action = function(pos, node, meta, supply, demand)
         -- Manual power check so autostate turns us visibly off when the
         -- network can not supply the required 200 Cj.
         if demand + POWER_NEEDED > supply then
+            mark_fed(meta, false)
             meta:set_string("infotext", S("Not enough power"))
             return 0
         end
+        mark_fed(meta, true)
         meta:set_string("infotext", S("Running"))
         -- Actual mote collection happens in the ABM below.
         return POWER_NEEDED
@@ -93,17 +129,25 @@ sbz_api.register_stateful_machine("no_horizons:mote_catcher", {
 -- ======================================================================
 
 -- Without power the catcher would be looted by chance storms miles away
--- from a player.  Only the powered "_on" node collects.  Runs every 3
+-- from a player.  Only a machine whose action function was actually called
+-- recently collects; being lit is not enough, see POWER_STALE.  Runs every 12
 -- seconds.
 core.register_abm({
     label = "Mote catcher storm proximity",
     nodenames = { "no_horizons:mote_catcher_on" },
-    interval = 3,
+    interval = 12,
     chance = 1,
     action = function(pos, node)
         -- The catcher reaches a few nodes past the literal storm volume, so
         -- a catcher parked just outside the cuboid still collects motes.
         local margin = 2
+        local meta = core.get_meta(pos)
+        if not is_fed(meta) then
+            -- Stalled rig, unplugged cable or no network at all: go dark.
+            mark_fed(meta, false)
+            sbz_api.turn_off(pos)
+            return
+        end
         local now_us = core.get_us_time()
         local lifetime_us = sbz_api.storm_activity_duration_us or 20e6
         local storms = sbz_api.active_storms or {}
@@ -124,7 +168,6 @@ core.register_abm({
             if pos.x >= smin.x - margin and pos.x <= smax.x + margin
                     and pos.y >= smin.y - margin and pos.y <= smax.y + margin
                     and pos.z >= smin.z - margin and pos.z <= smax.z + margin then
-                local meta = core.get_meta(pos)
                 local inv = meta:get_inventory()
                 local count = math.random(1, 3)
                 local stack = ItemStack("no_horizons:warp_mote " .. count)
@@ -137,21 +180,6 @@ core.register_abm({
                         core.pos_to_string(pos), storm.id or -1, storm.name or "?",
                         i, #storms, count
                     ))
-
-                    core.add_particlespawner({
-                        amount = 8,
-                        time = 1,
-                        minpos = vector.subtract(pos, 0.5),
-                        maxpos = vector.add(pos, 0.5),
-                        minvel = { x = -1, y = 1, z = -1 },
-                        maxvel = { x = 1, y = 3, z = 1 },
-                        minexptime = 0.5,
-                        maxexptime = 1.0,
-                        minsize = 1,
-                        maxsize = 2,
-                        texture = "mote.png^[multiply:#c8a0ff",
-                        glow = 12,
-                    })
                 end
                 break -- one collection per tick even if several storms overlap
             end

@@ -60,7 +60,7 @@ local function build_chain(pusher_pos, dir, owner, depth)
     local front = vector.add(pusher_pos, dir)
 
     for i = 2, depth + 1 do
-        local node = core.get_node_or_nil(front)
+        local node = sbz_api.get_node_force(front)
         if node == nil or node.name == "ignore" then
             return nil, "unloaded"
         end
@@ -85,7 +85,7 @@ local function build_chain(pusher_pos, dir, owner, depth)
     end
 
     -- Hit the shove limit; the very next cell must be open to receive the line
-    local node = core.get_node_or_nil(front)
+    local node = sbz_api.get_node_force(front)
     if node == nil or node.name == "ignore" then
         return nil, "unloaded"
     end
@@ -109,7 +109,10 @@ local function do_shove(chain, dir)
     for i = #chain, 1, -1 do
         local from = chain[i]
         local to = vector.add(from, dir)
-        local node = core.get_node(from)
+        local node = sbz_api.get_node_force(from)
+        if not node then
+            return false
+        end
         local meta = core.get_meta(from):to_table()
         local timer = core.get_node_timer(from)
         moved[#moved + 1] = {
@@ -163,7 +166,7 @@ end
 local function pusher_action(pos, node, meta, supply, demand)
     -- The grid can still hold our old position after we walked away, and the
     -- `node` argument is only the node *name* (the grid passes just that).
-    local here = core.get_node(pos)
+    local here = sbz_api.get_node_force(pos)
 
     -- Push depth is configured per block (1..MAX_DEPTH via the formspec).
     -- Power scales with it: depth * POWER_PER_BLOCK per shove.
@@ -173,7 +176,7 @@ local function pusher_action(pos, node, meta, supply, demand)
     end
     local needed = pusher_power(depth)
 
-    if here.name ~= PUSHER then
+    if not here or here.name ~= PUSHER then
         return needed
     end
 
@@ -224,7 +227,8 @@ local function pusher_action(pos, node, meta, supply, demand)
         return needed
     end
 
-    meta:set_string("infotext", ("Running (depth %d, %d Cj)"):format(depth, needed))
+    local moved_meta = core.get_meta(vector.add(pos, dir))
+    moved_meta:set_string("infotext", ("Running (depth %d, %d Cj)"):format(depth, needed))
 
     local front = vector.add(chain[#chain], dir)
     core.sound_play("mix_compressor_twice", {

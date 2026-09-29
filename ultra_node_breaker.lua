@@ -12,6 +12,7 @@
 --]]
 
 local S = core.get_translator("no_horizons")
+local ULTRA_POWER_NEEDED = 30
 
 pipeworks.register_wielder({
     name = "no_horizons:ultra_node_breaker",
@@ -29,8 +30,8 @@ pipeworks.register_wielder({
     wield_hand = true,
     eject_drops = false,
     action = function(fakeplayer, pointed)
-        local node = core.get_node(pointed.under)
-        if node.name == "air" or node.name == "ignore" then
+        local node = sbz_api.get_node_force(pointed.under)
+        if not node or node.name == "air" or node.name == "ignore" then
             return false
         end
         local node_def = core.registered_nodes[node.name]
@@ -42,9 +43,29 @@ pipeworks.register_wielder({
             return false
         end
         if sound then core.sound_play(sound, { pos = pointed.under }, true) end
+        -- pipeworks hands us a "pointed" thing with under/above deliberately
+        -- switched around: under = pos - dir, above = pos - 2 * dir, so
+        -- under - above is the facing and one more step along it is the
+        -- digger itself.  The dust belongs to the machine doing the digging,
+        -- not to whatever it just ate.
+        local facing = vector.subtract(pointed.under, pointed.above)
+        local digger = vector.add(pointed.under, facing)
+        core.add_particlespawner({
+            amount = 64,
+            time = 0.25,
+            minpos = vector.subtract(digger, 0.4),
+            maxpos = vector.add(digger, 0.4),
+            minvel = { x = -0.5, y = 0.5, z = -0.5 },
+            maxvel = { x = 0.5, y = 1.5, z = 0.5 },
+            minexptime = 0.4,
+            maxexptime = 0.9,
+            minsize = 0.5,
+            maxsize = 1,
+            node = node,
+        })
         return true
     end,
-    cost = 30,
+    cost = ULTRA_POWER_NEEDED,
 })
 
 -- pipeworks.register_wielder hardcodes this node's definition, so the base
@@ -53,6 +74,9 @@ pipeworks.register_wielder({
 -- ABM fires "No network found"; restore a sane infotext immediately.
 local un_def = core.registered_nodes["no_horizons:ultra_node_breaker"]
 if un_def then
+    un_def.get_power_needed = function()
+        return ULTRA_POWER_NEEDED
+    end
     un_def.on_timeout = function(pos)
         core.get_meta(pos):set_string("infotext", S("Running"))
     end
