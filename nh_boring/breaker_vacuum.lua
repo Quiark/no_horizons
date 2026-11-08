@@ -7,11 +7,11 @@
     A small machine, similar to the Item Vacuum, but instead of picking up
     loose item entities it only pulls items out of the drop-buffer inventory
     ("main") of Node Breakers (pipeworks:nodebreaker) and Ultra Node Breakers
-    (no_horizons:ultra_node_breaker) within a radius of 3 nodes. It requires
+    (nh_boring:ultra_node_breaker) within a radius of 3 nodes. It requires
     20 Cj and has a 16-slot inventory compatible with pipeworks tubes.
 --]]
 
-local S = core.get_translator("no_horizons")
+local S = core.get_translator("nh_boring")
 
 local RADIUS = 3
 local POWER_NEEDED = 20
@@ -33,7 +33,7 @@ local function collect_from_breakers(pos, inv)
     iterate_around_radius(pos, function(bpos)
         local node = sbz_api.get_node_force(bpos)
         if node and (node.name == "pipeworks:nodebreaker"
-                or node.name == "no_horizons:ultra_node_breaker") then
+                or node.name == "nh_boring:ultra_node_breaker") then
             local binv = core.get_meta(bpos):get_inventory()
             local drops = binv:get_list("main")
             if drops then
@@ -47,7 +47,7 @@ local function collect_from_breakers(pos, inv)
     end, RADIUS)
 end
 
-sbz_api.register_stateful_machine("no_horizons:breaker_vacuum", {
+sbz_api.register_stateful_machine("nh_boring:breaker_vacuum", {
     description = S("Breaker Vacuum"),
     sounds = sbz_audio.machine(),
     tiles = { "breaker_vacuum.png" },
@@ -100,7 +100,7 @@ sbz_api.register_stateful_machine("no_horizons:breaker_vacuum", {
 })
 
 do -- Breaker Vacuum recipe scope
-    local BV = "no_horizons:breaker_vacuum_off"
+    local BV = "nh_boring:breaker_vacuum_off"
     local NB = "pipeworks:nodebreaker"
     local I_V = "sbz_power:item_vacuum"
     local BT = "pipeworks:tube_1"

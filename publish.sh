@@ -1,5 +1,8 @@
 #!/bin/bash
-export DEST=$SHARED_WORKSPACE/Luanti/ContentDB.proxy/packages/no_horizons
-mkdir -p $DEST
-cp * $DEST/
-cp -r models textures $DEST/
+set -euo pipefail
+export DEST=${DEST:-$SHARED_WORKSPACE/Luanti/ContentDB.proxy/packages}
+for m in nh_warpstorms nh_boring nh_nebula; do
+    rm -rf "$DEST/$m"
+    mkdir -p "$DEST/$m"
+    cp -R "$m/." "$DEST/$m/"
+done

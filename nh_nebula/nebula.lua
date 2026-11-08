@@ -4,7 +4,7 @@
 
     Filamentary nebula generator for Skyblock: Zero.
 
-    A nebula is a cloud of `no_horizons:warp_glass` RADIUS blocks in radius,
+    A nebula is a cloud of `nh_nebula:warp_glass` RADIUS blocks in radius,
     built out of three smooth noise fields:
 
         ENVELOPE  lobed silhouette, decides where the cloud is at all
@@ -48,8 +48,8 @@
     See nebula.md for the design notes and the engine facts behind it.
 --]]
 
-local S = core.get_translator("no_horizons")
-local NEON = "no_horizons:warp_glass"
+local S = core.get_translator("nh_nebula")
+local NEON = "nh_nebula:warp_glass"
 
 -- ======================================================================
 -- 1. FIELDS - every tunable in one table
@@ -893,14 +893,14 @@ local function pump()
             if not ok then
                 core.log(
                     "error",
-                    ("[no_horizons] nebula %d (%s) failed: %s"):format(site.id, site.name, tostring(res))
+                    ("[nh_nebula] nebula %d (%s) failed: %s"):format(site.id, site.name, tostring(res))
                 )
             else
                 storage:set_string("built:" .. site.id, site.sig)
                 site.done = true
                 core.log(
                     "action",
-                    ("[no_horizons] nebula %d %-13s @ (%d,%d,%d) r=%d: %d blocks, %d kept, lane_t %.4f, fill %.4f, %d ms"):format(
+                    ("[nh_nebula] nebula %d %-13s @ (%d,%d,%d) r=%d: %d blocks, %d kept, lane_t %.4f, fill %.4f, %d ms"):format(
                         site.id,
                         site.name,
                         site.pos.x,
@@ -959,7 +959,7 @@ end
 
 core.log(
     "action",
-    ("[no_horizons] %d nebula sites registered, priming at start: %s"):format(
+    ("[nh_nebula] %d nebula sites registered, priming at start: %s"):format(
         #sites,
         PRIME_ON_START and "yes" or "no"
     )
@@ -1181,7 +1181,7 @@ core.register_chatcommand("nh_nebula", {
 
         if flags.dry then
             local text, p, probe = render_ascii(pos, m)
-            core.log("action", "[no_horizons] nebula dry run at " .. core.pos_to_string(pos) .. "\n" .. text)
+            core.log("action", "[nh_nebula] nebula dry run at " .. core.pos_to_string(pos) .. "\n" .. text)
             for line in (text .. "\n"):gmatch("([^\n]*)\n?") do
                 core.chat_send_player(name, line)
             end

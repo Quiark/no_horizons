@@ -48,13 +48,13 @@
     keeps one rig from being piloted by two relays at once.
 --]]
 
-local S = core.get_translator("no_horizons")
+local S = core.get_translator("nh_boring")
 
 local GENERATION = 0 -- the relay makes no power; feed it batteries/generators
 local SCAN_BUDGET = 64 -- most nodes the local scan may touch before giving up
 local BLOCK_SIZE = 16
 local AUTONOMOUS_KEY = "autonomous"
-local RELAY_NAME = "no_horizons:power_relay"
+local RELAY_NAME = "nh_boring:power_relay"
 local RELAY_ON = RELAY_NAME .. "_on"
 local RELAY_OFF = RELAY_NAME .. "_off"
 
@@ -224,7 +224,7 @@ local function scan_rig(start)
                 queue[#queue + 1] = vector.copy(npos)
             end
 
-            if core.get_item_group(node.name, "no_horizons_relay") > 0 then
+            if core.get_item_group(node.name, "nh_boring_relay") > 0 then
                 relays[#relays + 1] = { pos = vector.copy(npos), node = node }
             elseif core.get_item_group(node.name, "sbz_battery") > 0 then
                 batteries[#batteries + 1] = { pos = vector.copy(npos), node = node }
@@ -419,7 +419,7 @@ local function relay_tick(pos)
                 format_power(supply), format_power(demand), driven))
     end)
     if not ok then
-        core.log("error", "[no_horizons] power_relay tick failed: " .. tostring(err))
+        core.log("error", "[nh_boring] power_relay tick failed: " .. tostring(err))
     end
 end
 
@@ -441,11 +441,11 @@ if mesecon and mesecon.register_on_mvps_move then
     end)
 end
 
-sbz_api.register_stateful("no_horizons:power_relay", {
+sbz_api.register_stateful("nh_boring:power_relay", {
     description = S("Power Relay"),
     sounds = sbz_audio.machine(),
     tiles = { "power_relay.png" },
-    groups = { matter = 1, cracky = 2, pipe_connects = 1, pipe_conducts = 1, no_horizons_relay = 1 },
+    groups = { matter = 1, cracky = 2, pipe_connects = 1, pipe_conducts = 1, nh_boring_relay = 1 },
     paramtype = "light",
     sunlight_propagates = true,
     is_ground_content = false,
@@ -528,7 +528,7 @@ sbz_api.register_stateful("no_horizons:power_relay", {
 -- tick is what flips it on.
 core.register_abm({
     label = "Power Relay tick",
-    nodenames = { "no_horizons:power_relay_off", "no_horizons:power_relay_on" },
+    nodenames = { "nh_boring:power_relay_off", "nh_boring:power_relay_on" },
     interval = 0.5,
     chance = 1,
     catch_up = false,
@@ -538,7 +538,7 @@ core.register_abm({
 })
 
 do -- Power Relay recipe: a miniaturised switching station.
-    local PR = "no_horizons:power_relay_off"
+    local PR = "nh_boring:power_relay_off"
     local SS = "sbz_power:switching_station"
     local MP = "sbz_resources:matter_plate"
     local RC = "sbz_resources:retaining_circuit"

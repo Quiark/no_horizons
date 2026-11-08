@@ -208,7 +208,7 @@ local function make_lightning_definition(frames, hex)
         use_texture_alpha = "clip", -- keep the bolt's transparency
         damage_per_second = LIGHTNING_DAMAGE, -- zaps a player standing inside
         groups = {
-            no_horizons_warp_lightning = 1, -- lets the decay ABM find every bolt
+            nh_warpstorms_warp_lightning = 1, -- lets the decay ABM find every bolt
             not_in_creative_inventory = 1,
             dig_immediate = 3,
         },
@@ -219,8 +219,8 @@ end
 
 for i = 1, #STORM_TYPES do
     local hex = VARIANT_HEX[i]
-    LIGHTNING_A_NAMES[i] = "no_horizons:warp_lightning_a_" .. i
-    LIGHTNING_B_NAMES[i] = "no_horizons:warp_lightning_b_" .. i
+    LIGHTNING_A_NAMES[i] = "nh_warpstorms:warp_lightning_a_" .. i
+    LIGHTNING_B_NAMES[i] = "nh_warpstorms:warp_lightning_b_" .. i
     core.register_node(LIGHTNING_A_NAMES[i], make_lightning_definition(BOLT_A_FRAMES, hex))
     core.register_node(LIGHTNING_B_NAMES[i], make_lightning_definition(BOLT_B_FRAMES, hex))
 end
@@ -250,11 +250,11 @@ local WARP_FLESH_GROUPS = {
 
 -- The storm may leave behind one of two fleshy variants.
 local WARP_FLESH_VARIANTS = {
-    "no_horizons:warp_flesh",
-    "no_horizons:warp_meat",
+    "nh_warpstorms:warp_flesh",
+    "nh_warpstorms:warp_meat",
 }
 
-core.register_node("no_horizons:warp_flesh", {
+core.register_node("nh_warpstorms:warp_flesh", {
     description = "Warp Flesh",
     tiles = { "fleshblock.png" },
     groups = WARP_FLESH_GROUPS,
@@ -262,7 +262,7 @@ core.register_node("no_horizons:warp_flesh", {
     is_ground_content = false,
 })
 
-core.register_node("no_horizons:warp_meat", {
+core.register_node("nh_warpstorms:warp_meat", {
     description = "Warp Meat",
     tiles = {
         {
@@ -292,15 +292,15 @@ core.register_node("no_horizons:warp_meat", {
 -- spawn_warp_storm_at step 4.)
 core.register_abm({
     label = "Warp lightning decay",
-    nodenames = { "group:no_horizons_warp_lightning" },
+    nodenames = { "group:nh_warpstorms_warp_lightning" },
     interval = 1, -- run once per second ...
     chance = 1, -- ... for every bolt in loaded mapblocks
     action = function(pos, node)
         local meta = core.get_meta(pos)
 
         -- Age the bolt; remove it once it has lived long enough.
-        local age = meta:get_int("no_horizons:lightning_age") + 1
-        meta:set_int("no_horizons:lightning_age", age)
+        local age = meta:get_int("nh_warpstorms:lightning_age") + 1
+        meta:set_int("nh_warpstorms:lightning_age", age)
         if age >= LIGHTNING_LIFETIME then
             core.remove_node(pos)
         end
@@ -616,7 +616,7 @@ local function spawn_warp_storm_at(center)
     local candle_count = count_candles_near(center)
     local dt_ms = (core.get_us_time() - t0) / 1000
     core.log("action", string.format(
-        "[no_horizons] candle protection scan at %s took %.2f ms (%d lit candles)",
+        "[nh_warpstorms] candle protection scan at %s took %.2f ms (%d lit candles)",
         core.pos_to_string(center), dt_ms, candle_count
     ))
     if candle_count > 0 then
@@ -624,14 +624,14 @@ local function spawn_warp_storm_at(center)
         if not severe or math.random() >= CANDLE_BYPASS_SEVERE_CHANCE then
             core.log(
                 "action",
-                "[no_horizons] Warp storm cancelled near " .. core.pos_to_string(center)
+                "[nh_warpstorms] Warp storm cancelled near " .. core.pos_to_string(center)
                     .. " (lit candle within " .. CANDLE_PROTECT_RADIUS .. " nodes)"
             )
             return
         end
         core.log(
             "action",
-            "[no_horizons] Severe warp storm forced through candle protection at "
+            "[nh_warpstorms] Severe warp storm forced through candle protection at "
                 .. core.pos_to_string(center)
         )
     end
@@ -674,7 +674,7 @@ local function spawn_warp_storm_at(center)
     for i = 1, #bolt_plan do
         bolt_positions[i] = bolt_plan[i].pos
         local meta = core.get_meta(bolt_plan[i].pos)
-        meta:set_int("no_horizons:lightning_age", 0)
+        meta:set_int("nh_warpstorms:lightning_age", 0)
     end
 
     -- 4b. Rain: motes spawn scattered anywhere inside the storm volume, sink a
@@ -716,7 +716,7 @@ local function spawn_warp_storm_at(center)
         else
             core.log(
                 "warning",
-                "[no_horizons] warp storm: sbz_api.move_node is unavailable, skipping a block move"
+                "[nh_warpstorms] warp storm: sbz_api.move_node is unavailable, skipping a block move"
             )
         end
     end
@@ -749,7 +749,7 @@ local function spawn_warp_storm_at(center)
     }
     if expired > 0 then
         core.log("action", string.format(
-            "[no_horizons] pruned %d expired storm record(s) before adding storm #%d"
+            "[nh_warpstorms] pruned %d expired storm record(s) before adding storm #%d"
                 .. " (%d storm(s) tracked)",
             expired, storm_seq, #active_storms
         ))
@@ -760,7 +760,7 @@ local function spawn_warp_storm_at(center)
     core.log(
         "action",
         string.format(
-            "[no_horizons] Warp storm #%d (%s) manifested at %s, volume %s..%s,"
+            "[nh_warpstorms] Warp storm #%d (%s) manifested at %s, volume %s..%s,"
                 .. " %d bolts, %d storm(s) tracked",
             storm_seq, ty.name, core.pos_to_string(center),
             core.pos_to_string(minp), core.pos_to_string(maxp),
@@ -795,7 +795,7 @@ sbz_api.spawn_warp_storm_at = spawn_warp_storm_at
 
 -- A block that summons a warp storm when punched. Useful for testing or
 -- building "storm callers" in-game.
-core.register_node("no_horizons:storm_trigger", {
+core.register_node("nh_warpstorms:storm_trigger", {
     description = "Warp Storm Trigger",
     tiles = {
         "skyblktwo_storm_trigger_top.png",

@@ -24,9 +24,9 @@
     never pushes into an unloaded mapblock.
 --]]
 
-local S = core.get_translator("no_horizons")
+local S = core.get_translator("nh_boring")
 
-local PUSHER = "no_horizons:pusher"
+local PUSHER = "nh_boring:pusher"
 
 local POWER_PER_BLOCK = 50 -- Cj drained per shove per unit of push depth
 local MAX_DEPTH = 5 -- configurable push depth (blocks pushed, not counting the pusher)
@@ -73,6 +73,9 @@ local function build_chain(pusher_pos, dir, owner, depth)
                 return nil, "protected"
             end
             return chain, front
+        end
+        if nh_boring.is_protected_node(node) then
+            return nil, "protected"
         end
         if mesecon and mesecon.is_mvps_stopper(node, front, vector.add(front, dir)) then
             return nil, "blocked"
@@ -275,7 +278,7 @@ local function pusher_formspec(depth)
     })
 end
 
-sbz_api.register_machine("no_horizons:pusher", {
+sbz_api.register_machine("nh_boring:pusher", {
     description = S("Pusher"),
     _tt_help = S("Powered piston that pushes blocks and itself"),
     _doc_items_longdesc = S(
@@ -377,7 +380,7 @@ sbz_api.register_machine("no_horizons:pusher", {
 })
 
 do -- Pusher recipe scope
-    local PU = "no_horizons:pusher"
+    local PU = "nh_boring:pusher"
     local MP = "sbz_resources:matter_plate"
     local RC = "sbz_resources:retaining_circuit"
     local AL = "sbz_chem:aluminum_ingot"

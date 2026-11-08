@@ -8,7 +8,7 @@
 -- See warp_storm.lua for the storm it triggers; textures are the three
 -- eyeplant*.png frames.
 
-local S = core.get_translator("no_horizons")
+local S = core.get_translator("nh_warpstorms")
 
 -- ======================================================================
 -- 0. TUNABLE CONSTANTS (adjust these, not the code below)
@@ -19,8 +19,8 @@ local ORBPLANT_STAGES = 3
 
 -- Flesh blocks that an orbplant can sprout out of.
 local ORBPLANT_FLESH_NODES = {
-    "no_horizons:warp_flesh",
-    "no_horizons:warp_meat",
+    "nh_warpstorms:warp_flesh",
+    "nh_warpstorms:warp_meat",
 }
 
 -- Median time before a given flesh block sprouts an orbplant. Because the
@@ -78,7 +78,7 @@ local ORBPLANT_GROUPS_FINAL = {
 
 for i = 1, ORBPLANT_STAGES - 1 do
     local stage = i
-    core.register_node("no_horizons:orbplant_" .. stage, {
+    core.register_node("nh_warpstorms:orbplant_" .. stage, {
         description = S("Orbplant"),
         drawtype = "plantlike",
         tiles = { "eyeplant" .. stage .. ".png" },
@@ -97,13 +97,13 @@ for i = 1, ORBPLANT_STAGES - 1 do
         },
         drop = {},
         sounds = sbz_audio.blank(),
-        grow = sbz_api.plant_grow("no_horizons:orbplant_" .. (stage + 1)),
+        grow = sbz_api.plant_grow("nh_warpstorms:orbplant_" .. (stage + 1)),
     })
 end
 
 -- Mature orbplant: no longer grows, but its eye starts calling down warp
 -- storms. See the storm ABM below.
-core.register_node("no_horizons:orbplant_" .. ORBPLANT_STAGES, {
+core.register_node("nh_warpstorms:orbplant_" .. ORBPLANT_STAGES, {
     description = S("Orbplant"),
     drawtype = "plantlike",
     tiles = { "eyeplant" .. ORBPLANT_STAGES .. ".png" },
@@ -114,17 +114,17 @@ core.register_node("no_horizons:orbplant_" .. ORBPLANT_STAGES, {
     walkable = false,
     selection_box = ORBPLANT_SELECTION_BOX,
     groups = ORBPLANT_GROUPS_FINAL,
-    drop = "no_horizons:orbplant",
+    drop = "nh_warpstorms:orbplant",
     sounds = sbz_audio.blank(),
 })
 
 -- The pick-up-able item. Planting it on either flesh type places stage one;
 -- it cannot be placed on dirt or any soil.
-core.register_craftitem("no_horizons:orbplant", {
+core.register_craftitem("nh_warpstorms:orbplant", {
     description = S("Orbplant"),
     inventory_image = "eyeplant" .. ORBPLANT_STAGES .. ".png",
     groups = { ui_bio = 1 },
-    on_place = sbz_api.plant_plant("no_horizons:orbplant_1", ORBPLANT_FLESH_NODES),
+    on_place = sbz_api.plant_plant("nh_warpstorms:orbplant_1", ORBPLANT_FLESH_NODES),
 })
 
 -- ======================================================================
@@ -148,7 +148,7 @@ core.register_abm({
             return -- too dark to sprout, like any other plant
         end
 
-        core.set_node(above, { name = "no_horizons:orbplant_1" })
+        core.set_node(above, { name = "nh_warpstorms:orbplant_1" })
         core.sound_play(
             { name = "mix_sad_crackly_poof", gain = 0.5, max_hear_distance = 8 },
             { pos = pos }
@@ -165,7 +165,7 @@ core.register_abm({
 -- advances after a median wait of ORBPLANT_GROW_MEDIAN_SECONDS.
 core.register_abm({
     label = "Orbplant growth",
-    nodenames = { "no_horizons:orbplant_1", "no_horizons:orbplant_2" },
+    nodenames = { "nh_warpstorms:orbplant_1", "nh_warpstorms:orbplant_2" },
     interval = ABM_INTERVAL,
     chance = chance_for_median(ORBPLANT_GROW_MEDIAN_SECONDS),
     action = function(pos, node)
@@ -191,7 +191,7 @@ local STORM_CHANCE = math.max(1, math.floor(ORBPLANT_STORM_EVERY_SECONDS / ABM_I
 
 core.register_abm({
     label = "Orbplant warp storms",
-    nodenames = { "no_horizons:orbplant_" .. ORBPLANT_STAGES },
+    nodenames = { "nh_warpstorms:orbplant_" .. ORBPLANT_STAGES },
     interval = ABM_INTERVAL,
     chance = STORM_CHANCE,
     action = function(pos)

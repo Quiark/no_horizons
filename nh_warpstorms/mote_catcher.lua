@@ -12,13 +12,13 @@
     gets.
 --]]
 
-local S = core.get_translator("no_horizons")
+local S = core.get_translator("nh_warpstorms")
 
 -- ======================================================================
 -- 1. WARP MOTE ITEM
 -- ======================================================================
 
-core.register_craftitem("no_horizons:warp_mote", {
+core.register_craftitem("nh_warpstorms:warp_mote", {
     description = S("Warp Mote"),
     inventory_image = "mote.png",
     stack_max = 256,
@@ -61,7 +61,7 @@ listring[context;main]
 listring[current_player;main]
 ]]
 
-sbz_api.register_stateful_machine("no_horizons:mote_catcher", {
+sbz_api.register_stateful_machine("nh_warpstorms:mote_catcher", {
     description = S("Mote Catcher"),
     sounds = sbz_audio.machine(),
     tiles = { "partcatch.png" },
@@ -134,7 +134,7 @@ sbz_api.register_stateful_machine("no_horizons:mote_catcher", {
 -- seconds.
 core.register_abm({
     label = "Mote catcher storm proximity",
-    nodenames = { "no_horizons:mote_catcher_on" },
+    nodenames = { "nh_warpstorms:mote_catcher_on" },
     interval = 12,
     chance = 1,
     action = function(pos, node)
@@ -157,7 +157,7 @@ core.register_abm({
         -- Debug log: how many storm records this catcher sees each tick, so
         -- it is obvious when a single storm is registered more than once.
         core.log("action", string.format(
-            "[no_horizons] mote_catcher at %s: %d storm(s) tracked",
+            "[nh_warpstorms] mote_catcher at %s: %d storm(s) tracked",
             core.pos_to_string(pos), #storms
         ))
         for i, storm in ipairs(storms) do
@@ -170,12 +170,12 @@ core.register_abm({
                     and pos.z >= smin.z - margin and pos.z <= smax.z + margin then
                 local inv = meta:get_inventory()
                 local count = math.random(1, 3)
-                local stack = ItemStack("no_horizons:warp_mote " .. count)
+                local stack = ItemStack("nh_warpstorms:warp_mote " .. count)
                 if inv:room_for_item("main", stack) then
                     inv:add_item("main", stack)
 
                     core.log("action", string.format(
-                        "[no_horizons] mote_catcher at %s: storm #%d (%s, "
+                        "[nh_warpstorms] mote_catcher at %s: storm #%d (%s, "
                             .. "entry %d/%d) matches; collected %d motes",
                         core.pos_to_string(pos), storm.id or -1, storm.name or "?",
                         i, #storms, count
@@ -198,7 +198,7 @@ do
     local AM = "sbz_resources:antimatter_dust"
     local WC = "sbz_resources:warp_crystal"
     core.register_craft({
-        output = "no_horizons:mote_catcher_off",
+        output = "nh_warpstorms:mote_catcher_off",
         recipe = {
             { TB, PC, TB },
             { AM, "",  AM },

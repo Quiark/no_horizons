@@ -12,9 +12,9 @@
     fields and coloured floor markers.
 --]]
 
-local S = core.get_translator("no_horizons")
+local S = core.get_translator("nh_nebula")
 
-local WARP_GLASS = "no_horizons:warp_glass"
+local WARP_GLASS = "nh_nebula:warp_glass"
 
 -- How see-through the glass is, 0-255. Because the texture is solid white
 -- the opacity modifier is the only thing shaping it: lower this for a
@@ -59,7 +59,7 @@ core.register_node(WARP_GLASS, unifieddyes.def({
 
 do -- Warp Glass recipe scope
     local EG = "sbz_resources:emittrium_glass"
-    local WM = "no_horizons:warp_mote"
+    local WM = "nh_nebula:warp_mote"
     core.register_craft({
         output = WARP_GLASS .. " 8",
         recipe = {

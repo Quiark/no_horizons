@@ -11,11 +11,11 @@
     Breaker Vacuum.
 --]]
 
-local S = core.get_translator("no_horizons")
+local S = core.get_translator("nh_boring")
 local ULTRA_POWER_NEEDED = 30
 
 pipeworks.register_wielder({
-    name = "no_horizons:ultra_node_breaker",
+    name = "nh_boring:ultra_node_breaker",
     description = S("Ultra Node Breaker"),
     tiles = {
         "ultra_nodebreaker_side.png",
@@ -36,6 +36,9 @@ pipeworks.register_wielder({
         end
         local node_def = core.registered_nodes[node.name]
         if not node_def or not node_def.on_dig then
+            return false
+        end
+        if nh_boring.is_protected_node(node) then
             return false
         end
         local sound = node_def.sounds and node_def.sounds.dug
@@ -72,7 +75,7 @@ pipeworks.register_wielder({
 -- grid's "Machine timeout check" ABM hook has to be bolted on afterward.
 -- When powered by a Power Relay (which never "touches" base-grid state) that
 -- ABM fires "No network found"; restore a sane infotext immediately.
-local un_def = core.registered_nodes["no_horizons:ultra_node_breaker"]
+local un_def = core.registered_nodes["nh_boring:ultra_node_breaker"]
 if un_def then
     un_def.get_power_needed = function()
         return ULTRA_POWER_NEEDED
@@ -83,7 +86,7 @@ if un_def then
 end
 
 do -- Ultra Node Breaker recipe scope
-    local UNB = "no_horizons:ultra_node_breaker"
+    local UNB = "nh_boring:ultra_node_breaker"
     local NB = "pipeworks:nodebreaker"
     local MA = "sbz_resources:matter_annihilator"
     local RC = "sbz_resources:retaining_circuit"

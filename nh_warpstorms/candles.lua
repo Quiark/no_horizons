@@ -1,7 +1,7 @@
 -- Candles, adapted from mineclonia's mcl_candles for Skyblock: Zero
 -- Uses unifieddyes for coloring, sbz_bio:igniter for lighting
 
-local S = core.get_translator("no_horizons")
+local S = core.get_translator("nh_warpstorms")
 
 local candle_boxes = {
 	{-0.0625, -0.5, -0.0625, 0.0625, -0.125, 0.0625},
@@ -18,7 +18,7 @@ local function drop_candles(pos, node, _, digger)
 	local group = core.get_item_group(node.name, "candles")
 	if group == 0 then return end
 
-	local item = ItemStack("no_horizons:candle_1 " .. group)
+	local item = ItemStack("nh_warpstorms:candle_1 " .. group)
 	local color_index = node.param2 > 0 and node.param2
 	if color_index and color_index ~= 240 then
 		item:get_meta():set_int("palette_index", color_index)
@@ -31,7 +31,7 @@ local function ignite_candle(pos)
 	local n = core.get_node(pos)
 	local g = core.get_item_group(n.name, "candles")
 	if g > 0 then
-		n.name = "no_horizons:candle_lit_" .. tostring(g)
+		n.name = "nh_warpstorms:candle_lit_" .. tostring(g)
 		core.swap_node(pos, n)
 		core.sound_play("gen_zap_short", { pos = pos, gain = 0.3, max_hear_distance = 8 })
 		return true
@@ -44,7 +44,7 @@ local function extinguish_candle(pos, node, clicker)
 
 	local group = core.get_item_group(node.name, "lit_candles")
 	if group > 0 then
-		node.name = "no_horizons:candle_" .. group
+		node.name = "nh_warpstorms:candle_" .. group
 		core.swap_node(pos, node)
 	end
 end
@@ -58,7 +58,7 @@ local function candle_on_place(itemstack, placer, pointed_thing)
 	local param2 = tonumber(itemstack:get_meta():get("palette_index")) or 240
 
 	if group > 0 and group < #candle_boxes then
-		unode.name = "no_horizons:candle_" .. math.min(4, group + 1)
+		unode.name = "nh_warpstorms:candle_" .. math.min(4, group + 1)
 		if param2 == unode.param2 or unode.param2 == 240 then
 			unode.param2 = param2
 			core.swap_node(pointed_thing.under, unode)
@@ -89,7 +89,7 @@ for i = 1, #candle_boxes do
 	end
 	for k, v in pairs(creative_group) do groups[k] = v end
 
-	core.register_node("no_horizons:candle_" .. i, {
+	core.register_node("nh_warpstorms:candle_" .. i, {
 		description = S("Candle"),
 		drawtype = "mesh",
 		paramtype = "light",
@@ -114,7 +114,7 @@ for i = 1, #candle_boxes do
 		end,
 	})
 
-	core.register_node("no_horizons:candle_lit_" .. i, {
+	core.register_node("nh_warpstorms:candle_lit_" .. i, {
 		description = S("Lit Candle"),
 		drawtype = "mesh",
 		paramtype = "light",
@@ -155,7 +155,7 @@ end
 
 -- Crafting: paper + fiberweed = candle
 core.register_craft({
-	output = "no_horizons:candle_1",
+	output = "nh_warpstorms:candle_1",
 	recipe = {
 		{"sbz_bio:paper"},
 		{"sbz_bio:fiberweed"},

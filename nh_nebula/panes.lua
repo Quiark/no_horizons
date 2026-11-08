@@ -1,45 +1,6 @@
--- Warp storms: random lightning storms that briefly appear near players,
--- strike the area with VoxelManip-placed bolts, warp a few existing
--- blocks around and can leave warp flesh behind. See warp_storm.lua.
-dofile(core.get_modpath("no_horizons") .. "/warp_storm.lua")
-
--- Candles: colorable light sources, lit with igniter. See candles.lua.
-dofile(core.get_modpath("no_horizons") .. "/candles.lua")
-
--- Candles quest page in the base game's questbook. See quests.lua.
-dofile(core.get_modpath("no_horizons") .. "/quests.lua")
-
--- Orbplant: a flesh-grown plant that needs CO₂ and calls down warp storms
--- when mature. See orbplant.lua.
-dofile(core.get_modpath("no_horizons") .. "/orbplant.lua")
-
--- Mote Catcher: a machine that collects warp motes from nearby storms.
--- See mote_catcher.lua.
-dofile(core.get_modpath("no_horizons") .. "/mote_catcher.lua")
-
--- Breaker Vacuum: a machine that pulls drops out of nearby Node Breakers.
--- See breaker_vacuum.lua.
-dofile(core.get_modpath("no_horizons") .. "/breaker_vacuum.lua")
-
--- Ultra Node Breaker: breaks any node and keeps drops for the vacuum.
--- See ultra_node_breaker.lua.
-dofile(core.get_modpath("no_horizons") .. "/ultra_node_breaker.lua")
-
--- Pusher: a powered piston that pushes blocks AND itself, marching forward
--- indefinitely. See pusher.lua.
-dofile(core.get_modpath("no_horizons") .. "/pusher.lua")
-
--- Power Relay: a self-contained mini switching station for mobile rigs that
--- can be safely shoved around by a Pusher. See power_relay.lua.
-dofile(core.get_modpath("no_horizons") .. "/power_relay.lua")
-
--- Nebulas: filamentary warp glass clouds that build themselves from world
--- gen. See nebula.lua and nebula.md.
-dofile(core.get_modpath("no_horizons") .. "/nebula.lua")
-
--- Warp Glass: textureless, colourable glass you can walk through.
--- See warp_glass.lua.
-dofile(core.get_modpath("no_horizons") .. "/warp_glass.lua")
+-- Tinted glass panes: thin, colourable panes for every tinted
+-- glass the base game registers. See ../init.lua in git history
+-- for the comment this section was split out of.
 
 local pane_nodebox = {
     type = "connected",
@@ -242,6 +203,6 @@ core.register_on_mods_loaded(function()
     end
 
     if not found then
-        core.log("error", "[no_horizons] No base-game tinted glass node found; panes were not registered")
+        core.log("error", "[nh_nebula] No base-game tinted glass node found; panes were not registered")
     end
 end)

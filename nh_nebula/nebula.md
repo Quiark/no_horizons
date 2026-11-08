@@ -1,7 +1,7 @@
 # Nebula generator - design notes and plan
 
 Settling the noise for a ~200 block diameter nebula, before wiring up any
-gameplay. Target look is filamentary/wispy, built out of `no_horizons:warp_glass`,
+gameplay. Target look is filamentary/wispy, built out of `nh_nebula:warp_glass`,
 built instantly with one acceptable lag spike.
 
 ## The problem to solve
@@ -114,7 +114,7 @@ mapblocks. The node count is the real cost here, larger than the compute.
 
 ## Files
 
-**`no_horizons/nebula.lua`** (new) - the whole prototype:
+**`nh_nebula/nebula.lua`** (new) - the whole prototype:
 
 - `local FIELDS = {...}` - every tunable in one table at the top: `RADIUS`, the
   per-field spread/octaves/persist/seeds, `LANE_FRACTION`, `LANE_DEPTH`,
@@ -132,7 +132,7 @@ mapblocks. The node count is the real cost here, larger than the compute.
   `privileges = {privs = {interact = true}}`, positioned at the player and
   offset up so it does not bury them.
 
-**`no_horizons/init.lua`** - one `dofile` line, matching the existing comment
+**`nh_nebula/init.lua`** - one `dofile` line, matching the existing comment
 style.
 
 No node registration, no recipe, no `unified_inventory` entry. `warp_glass`

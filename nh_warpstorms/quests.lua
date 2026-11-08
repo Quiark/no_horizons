@@ -3,13 +3,13 @@
 -- mod.conf) so the API is guaranteed to exist here.
 --
 
-local S = core.get_translator("no_horizons")
+local S = core.get_translator("nh_warpstorms")
 
 local function register_candles_quests()
     if not (sbz_api and sbz_api.register_quest) then
         core.log(
             "warning",
-            "[no_horizons] sbz_progression not loaded, skipping candles quest page"
+            "[nh_warpstorms] sbz_progression not loaded, skipping candles quest page"
         )
         return
     end
@@ -27,7 +27,7 @@ local function register_candles_quests()
         info = true, -- quest page (shows as a "!" info entry)
         title = S("Candles"),
         text = "Candles can be crafted from paper and fiberweed. They can be placed on any solid surface "
-		.. "and can be lit with an igniter. They provide peace and calm for a stormy night."
+		.. "and can be lit with an igniter. They provide peace and calm for a stormy night... in 50 block range"
     })
 
     -- Secret page about the Mote Catcher. It shows as "???" in the book
@@ -37,7 +37,8 @@ local function register_candles_quests()
         id = "qid_mote_catcher",
         type = "secret",
         title = S("Mote Catcher"),
-        text = "The Mote Catcher is a machine that collects warp motes that drift in when a warp storm rages nearby. It needs power to run.",
+        text = "The Mote Catcher is a machine that collects warp motes that drift in when a warp storm rages nearby. "
+		.. "It needs power to run.",
     })
 end
 
@@ -45,18 +46,12 @@ register_candles_quests()
 
 -- ======================================================================
 -- Reveal the Mote Catcher secret page only once the player has a flesh
--- block in inventory. Flesh nodes drop themselves when dug (see
--- warp_storm.lua), so the dug block shows up in inventory as the item
--- name. Reveal both flesh variants; calling unlock_achievement on the
--- secret quest's own id makes the questbook swap "???" for the real
--- title (secret quests render that way, see questbook.lua:185-196).
--- This repeats the base game's flesh-unlock pattern (sbz_progression's
--- achievement_in_inventory_table is local, so we do it here instead).
+-- block in inventory. 
 -- ======================================================================
 
 local flesh_tracked = {
-    ["no_horizons:warp_flesh"] = "qid_mote_catcher",
-    ["no_horizons:warp_meat"] = "qid_mote_catcher",
+    ["nh_warpstorms:warp_flesh"] = "qid_mote_catcher",
+    ["nh_warpstorms:warp_meat"] = "qid_mote_catcher",
 }
 
 core.register_on_player_inventory_action(function(player, action, inv, inv_info)
